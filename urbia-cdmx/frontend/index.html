@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URBIA CDMX — Plataforma Inteligente de Infraestructura Urbana</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --rojo:    #dc2626;
+      --naranja: #ea580c;
+      --amarillo:#ca8a04;
+      --verde:   #16a34a;
+      --azul:    #2563eb;
+      --indigo:  #4f46e5;
+      --gris-bg: #f1f5f9;
+      --gris-borde: #e2e8f0;
+      --texto:   #0f172a;
+      --texto-suave: #64748b;
+      --blanco:  #ffffff;
+      --sidebar: #0f172a;
+      --sidebar-hover: #1e293b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--gris-bg); color: var(--texto); display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 220px; min-height: 100vh; background: var(--sidebar);
+      display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0;
+      position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+    }
+    .logo { padding: 0 20px 24px; border-bottom: 1px solid #1e293b; }
+    .logo h1 { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo span { color: #94a3b8; font-size: 12px; }
+    nav { margin-top: 16px; flex: 1; }
+    nav a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; color: #94a3b8; text-decoration: none;
+      font-size: 14px; font-weight: 500; transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    nav a:hover, nav a.active {
+      background: var(--sidebar-hover); color: #fff;
+      border-left-color: var(--azul);
+    }
+    nav a .icon { font-size: 16px; width: 20px; text-align: center; }
+    .demo-badge {
+      margin: 16px; padding: 8px 12px; background: #7c2d12;
+      border-radius: 6px; color: #fed7aa; font-size: 11px; line-height: 1.4;
+    }
+
+    /* ── Main ── */
+    #main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar {
+      background: var(--blanco); padding: 14px 28px;
+      border-bottom: 1px solid var(--gris-borde);
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar h2 { font-size: 16px; font-weight: 600; }
+    .topbar-right { display: flex; gap: 10px; align-items: center; }
+    .btn {
+      padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      border: none; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--azul); color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-outline { background: transparent; border: 1px solid var(--gris-borde); color: var(--texto); }
+    .btn-outline:hover { background: var(--gris-bg); }
+
+    .content { padding: 24px 28px; flex: 1; }
+
+    /* ── Secciones ── */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── Tarjetas de resumen ── */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--blanco); border-radius: 10px; padding: 18px;
+      border: 1px solid var(--gris-borde); box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .card .label { font-size: 12px; color: var(--texto-suave); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+    .card .value { font-size: 32px; font-weight: 700; margin: 6px 0 2px; }
+    .card .sub { font-size: 12px; color: var(--texto-suave); }
+    .card.red .value { color: var(--rojo); }
+    .card.orange .value { color: var(--naranja); }
+    .card.blue .value { color: var(--azul); }
+    .card.green .value { color: var(--verde); }
+
+    /* ── Mapa ── */
+    #map { height: 500px; border-radius: 10px; border: 1px solid var(--gris-borde); }
+    .map-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .map-filters select, .map-filters input {
+      padding: 7px 11px; border-radius: 6px; border: 1px solid var(--gris-borde);
+      font-size: 13px; background: var(--blanco); color: var(--texto);
+    }
+    .nivel-checks { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .nivel-check { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--gris-borde); background: var(--blanco); }
+    .nivel-check input { cursor: pointer; }
+    .nivel-check.critica { border-color: #dc2626; }
+    .nivel-check.alta    { border-color: #ea580c; }
+    .nivel-check.media   { border-color: #ca8a04; }
+    .nivel-check.baja    { border-color: #16a34a; }
+    .nivel-check.critica:has(input:checked) { background: #fee2e2; }
+    .nivel-check.alta:has(input:checked)    { background: #ffedd5; }
+    .nivel-check.media:has(input:checked)   { background: #fef9c3; }
+    .nivel-check.baja:has(input:checked)    { background: #dcfce7; }
+    .leyenda-mapa { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; font-size: 12px; padding: 8px 12px; background: var(--blanco); border-radius: 8px; border: 1px solid var(--gris-borde); }
+    .leyenda-item { display: flex; align-items: center; gap: 6px; }
+    .leyenda-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,.2); flex-shrink: 0; }
+    .motor-card { background: var(--blanco); border: 1px solid var(--gris-borde); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+    .motor-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .motor-formula { font-family: monospace; background: #f8fafc; padding: 10px 14px; border-radius: 6px; font-size: 14px; border: 1px solid var(--gris-borde); margin-bottom: 14px; }
+    .nivel-desc { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 8px; margin-bottom: 8px; }
+    .nivel-badge-grande { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+    /* ── Tabla ranking ── */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--gris-borde); background: var(--blanco); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { padding: 11px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--texto-suave); background: var(--gris-bg); border-bottom: 1px solid var(--gris-borde); }
+    tbody td { padding: 11px 14px; border-bottom: 1px solid var(--gris-borde); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .badge-critica { background: #fee2e2; color: var(--rojo); }
+    .badge-alta    { background: #ffedd5; color: var(--naranja); }
+    .badge-media   { background: #fef9c3; color: var(--amarillo); }
+    .badge-baja    { background: #dcfce7; color: var(--verde); }
+    .badge-emergencia { background: #dc2626; color: #fff; animation: pulso 1.2s infinite; }
+    .badge-demo    { background: #e0e7ff; color: #4338ca; }
+    .badge-real    { background: #dcfce7; color: #15803d; }
+    @keyframes pulso { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+
+    .puntaje-bar { display: flex; align-items: center; gap: 8px; }
+    .puntaje-track { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; }
+    .puntaje-fill { height: 6px; border-radius: 3px; }
+
+    .justificacion-btn { font-size: 11px; color: var(--azul); cursor: pointer; text-decoration: underline; background: none; border: none; }
+    .justificacion-panel { display: none; margin-top: 6px; padding: 8px; background: #f0f9ff; border-radius: 6px; font-size: 12px; white-space: pre-wrap; border: 1px solid #bae6fd; color: #0369a1; }
+
+    /* ── Chat ── */
+    #chat-container { display: flex; flex-direction: column; height: 500px; border-radius: 10px; border: 1px solid var(--gris-borde); background: var(--blanco); overflow: hidden; }
+    #chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+    .msg-user { background: var(--azul); color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg-bot  { background: #f1f5f9; color: var(--texto); align-self: flex-start; border-bottom-left-radius: 2px; white-space: pre-wrap; }
+    .msg-meta { font-size: 11px; color: var(--texto-suave); margin-top: 4px; align-self: flex-start; }
+    #chat-input-row { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--gris-borde); }
+    #chat-input { flex: 1; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--gris-borde); font-size: 14px; font-family: inherit; }
+    #chat-send { padding: 9px 18px; background: var(--azul); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .preguntas-sugeridas { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+    .sugerencia { padding: 5px 10px; background: #eff6ff; color: var(--azul); border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid #bfdbfe; }
+    .sugerencia:hover { background: #dbeafe; }
+
+    /* ── Pesos ── */
+    .pesos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .peso-item { background: var(--blanco); border: 1px solid var(--gris-borde); border-radius: 8px; padding: 14px; }
+    .peso-item label { font-size: 12px; font-weight: 600; color: var(--texto-suave); display: block; margin-bottom: 6px; }
+    .peso-item input[type=range] { width: 100%; }
+    .peso-item .peso-val { font-size: 20px; font-weight: 700; color: var(--azul); }
+    #suma-pesos { font-size: 14px; font-weight: 600; }
+
+    /* ── Fuentes ── */
+    .fuentes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .fuente-card { background: var(--blanco); border: 1px solid var(--gris-borde); border-radius: 10px; padding: 16px; }
+    .fuente-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .fuente-card p { font-size: 12px; color: var(--texto-suave); margin-bottom: 4px; }
+    .fuente-card a { font-size: 12px; color: var(--azul); }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dot-green { background: var(--verde); }
+    .dot-red { background: var(--rojo); }
+
+    /* ── Upload ── */
+    .upload-area { border: 2px dashed var(--gris-borde); border-radius: 10px; padding: 32px; text-align: center; background: var(--blanco); }
+    .upload-area p { color: var(--texto-suave); font-size: 14px; }
+
+    /* ── Spinner ── */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: var(--azul); border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+    .alert-warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+    .alert-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+
+    .section-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .section-sub { font-size: 13px; color: var(--texto-suave); margin-bottom: 20px; }
+    @keyframes pulso { 0%,100%{opacity:1} 50%{opacity:.5} }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="logo">
+    <h1>🏙️ URBIA CDMX</h1>
+    <span>Infraestructura Urbana</span>
+  </div>
+  <nav>
+    <a href="#" class="active" data-section="chat"><span class="icon">🤖</span> URBIA AI</a>
+    <a href="#" data-section="resumen"><span class="icon">📊</span> Resumen</a>
+    <a href="#" data-section="mapa"><span class="icon">🗺️</span> Mapa de Riesgo</a>
+    <a href="#" data-section="ranking"><span class="icon">📋</span> Ranking</a>
+    <a href="#" data-section="planeacion"><span class="icon">🔧</span> Planeación</a>
+    <a href="#" data-section="fuentes"><span class="icon">📂</span> Fuentes</a>
+    <a href="#" data-section="carga"><span class="icon">⬆️</span> Cargar Datos</a>
+  </nav>
+</aside>
+
+<!-- Main -->
+<div id="main">
+  <div class="topbar">
+    <h2 id="page-title">URBIA AI — Asistente</h2>
+    <div class="topbar-right">
+      <span id="last-update" style="font-size:12px;color:#94a3b8;"></span>
+      <button class="btn btn-outline" onclick="recargarDatos()">↺ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- SECCIÓN: RESUMEN -->
+    <section id="sec-resumen" class="section">
+      <div class="section-title">Resumen General</div>
+      <div class="section-sub">Visión consolidada de la infraestructura urbana reportada en CDMX.</div>
+      <div class="alert alert-info">
+        📅 <strong>Fecha de la información:</strong>
+        Solicitudes 0311 Locatel (5,000 reportes): del 1 al 31 de diciembre de 2023 ·
+        Incidentes Viales C5 (3,000 reportes): del 31 de diciembre de 2021 al 17 de enero de 2022.
+        Son datos históricos oficiales de datos.cdmx.gob.mx; no reflejan el estado actual de las calles.
+      </div>
+      <div class="cards-grid" id="cards-resumen">
+        <div class="card"><div class="label">Cargando…</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px;">
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Por Categoría</div>
+          <div id="chart-categoria" style="background:var(--blanco);border-radius:10px;border:1px solid var(--gris-borde);padding:16px;"></div>
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Por Alcaldía</div>
+          <div id="chart-alcaldia" style="background:var(--blanco);border-radius:10px;border:1px solid var(--gris-borde);padding:16px;"></div>
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Por Nivel de Riesgo</div>
+          <div id="chart-niveles" style="background:var(--blanco);border-radius:10px;border:1px solid var(--gris-borde);padding:16px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN: MAPA -->
+    <section id="sec-mapa" class="section">
+      <div class="section-title">Mapa de Riesgo</div>
+      <div class="section-sub">Incidentes geolocalizados con coordenadas confirmadas. Selecciona una alcaldía para resaltar su perímetro.</div>
+      <div class="map-filters">
+        <select id="filtro-alcaldia-mapa" onchange="filtrarMapa()">
+          <option value="">Todas las alcaldías</option>
+        </select>
+        <select id="filtro-categoria-mapa" onchange="filtrarMapa()">
+          <option value="">Todas las categorías</option>
+          <option value="vial">Vial</option>
+          <option value="hidraulica">Hidráulica</option>
+          <option value="seguridad">Seguridad</option>
+        </select>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:600;color:var(--texto-suave);margin-bottom:6px;">FILTRAR POR NIVEL DE RIESGO</div>
+        <div class="nivel-checks">
+          <label class="nivel-check critica"><input type="checkbox" class="check-nivel" value="critica" checked onchange="filtrarMapa()"> 🔴 Crítica (70–100)</label>
+          <label class="nivel-check alta"><input type="checkbox" class="check-nivel" value="alta" checked onchange="filtrarMapa()"> 🟠 Alta (50–69)</label>
+          <label class="nivel-check media"><input type="checkbox" class="check-nivel" value="media" checked onchange="filtrarMapa()"> 🟡 Media (30–49)</label>
+          <label class="nivel-check baja"><input type="checkbox" class="check-nivel" value="baja" checked onchange="filtrarMapa()"> 🟢 Baja (0–29)</label>
+          <button class="btn btn-outline" style="font-size:12px;padding:5px 10px;" onclick="toggleTodosNiveles(true)">Todos</button>
+          <button class="btn btn-outline" style="font-size:12px;padding:5px 10px;" onclick="toggleTodosNiveles(false)">Ninguno</button>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="leyenda-mapa">
+        <div class="leyenda-item"><div class="leyenda-dot" style="background:#dc2626"></div><span><strong>Crítica (70–100):</strong> Atención inmediata — riesgo grave</span></div>
+        <div class="leyenda-item"><div class="leyenda-dot" style="background:#ea580c"></div><span><strong>Alta (50–69):</strong> Atención prioritaria — puede agravarse</span></div>
+        <div class="leyenda-item"><div class="leyenda-dot" style="background:#ca8a04"></div><span><strong>Media (30–49):</strong> Atención programada — sin riesgo inmediato</span></div>
+        <div class="leyenda-item"><div class="leyenda-dot" style="background:#16a34a"></div><span><strong>Baja (0–29):</strong> Mantenimiento rutinario</span></div>
+        <div class="leyenda-item"><div class="leyenda-dot" style="background:#1d4ed8;border:2px dashed #1d4ed8"></div><span>Perímetro de alcaldía (aproximado)</span></div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN: RANKING -->
+    <section id="sec-ranking" class="section">
+      <div class="section-title">Ranking de Prioridades</div>
+      <div class="section-sub">Incidentes ordenados por puntaje del motor de priorización. Las emergencias siempre aparecen primero.</div>
+
+      <!-- Explicación del motor -->
+      <details id="motor-explicacion" style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-size:14px;font-weight:600;padding:12px 16px;background:var(--blanco);border-radius:8px;border:1px solid var(--gris-borde);display:flex;align-items:center;gap:8px;">
+          ℹ️ ¿En qué se basa el puntaje de priorización?
+        </summary>
+        <div id="motor-detalle" style="padding:16px;background:var(--blanco);border:1px solid var(--gris-borde);border-top:none;border-radius:0 0 8px 8px;">
+          <div style="color:#64748b;font-size:12px;margin-bottom:12px;" id="motor-advertencia"></div>
+          <div class="motor-formula" id="motor-formula"></div>
+          <div id="motor-variables"></div>
+          <div style="margin-top:16px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Niveles de riesgo</div>
+            <div id="motor-niveles"></div>
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;" id="motor-nota-emerg"></div>
+        </div>
+      </details>
+
+      <!-- Ajuste de pesos -->
+      <details style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-size:14px;font-weight:600;padding:10px;background:var(--blanco);border-radius:8px;border:1px solid var(--gris-borde);">
+          ⚙️ Ajustar Pesos del Motor <span style="font-size:11px;color:#94a3b8;font-weight:400;">(ponderación propuesta — no es metodología oficial)</span>
+        </summary>
+        <div style="padding:16px;background:var(--blanco);border:1px solid var(--gris-borde);border-top:none;border-radius:0 0 8px 8px;">
+          <div class="pesos-grid" id="pesos-grid"></div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span id="suma-pesos">Suma: 1.00</span>
+            <button class="btn btn-primary" onclick="recalcularPesos()">Recalcular</button>
+            <button class="btn btn-outline" onclick="resetPesos()">Restablecer</button>
+          </div>
+        </div>
+      </details>
+
+      <div class="map-filters">
+        <select id="filtro-alcaldia-ranking" onchange="cargarRanking()">
+          <option value="">Todas las alcaldías</option>
+        </select>
+        <select id="filtro-categoria-ranking" onchange="cargarRanking()">
+          <option value="">Todas las categorías</option>
+          <option value="vial">Vial</option>
+          <option value="hidraulica">Hidráulica</option>
+          <option value="seguridad">Seguridad</option>
+        </select>
+        <select id="filtro-prioridad-ranking" onchange="cargarRanking()">
+          <option value="">Todos los niveles</option>
+          <option value="critica">🔴 Crítica (70–100)</option>
+          <option value="alta">🟠 Alta (50–69)</option>
+          <option value="media">🟡 Media (30–49)</option>
+          <option value="baja">🟢 Baja (0–29)</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Calle / Alcaldía</th>
+              <th>Categoría</th>
+              <th>Reportes</th>
+              <th>Prioridad</th>
+              <th>Puntaje</th>
+              <th>Origen</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECCIÓN: PLANEACIÓN -->
+    <section id="sec-planeacion" class="section">
+      <div class="section-title">Planeación Operativa</div>
+      <div class="section-sub">Simulador de recursos y escenarios de intervención.</div>
+      <div class="alert alert-warn">⚠️ Los recursos, costos y materiales mostrados son <strong>FICTICIOS</strong> y editables. Requieren levantamiento técnico real antes de cualquier uso institucional.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <!-- Plan A -->
+        <div style="background:var(--blanco);border:1px solid var(--gris-borde);border-radius:10px;padding:18px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px;color:var(--rojo);">Plan A — Mayor Riesgo</div>
+          <div style="font-size:12px;color:var(--texto-suave);margin-bottom:14px;">Atender los incidentes de mayor puntaje primero.</div>
+          <div id="plan-a-content"></div>
+        </div>
+        <!-- Plan B -->
+        <div style="background:var(--blanco);border:1px solid var(--gris-borde);border-radius:10px;padding:18px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px;color:var(--azul);">Plan B — Mayor Cobertura</div>
+          <div style="font-size:12px;color:var(--texto-suave);margin-bottom:14px;">Atender más incidentes posibles respetando presupuesto.</div>
+          <div id="plan-b-content"></div>
+        </div>
+      </div>
+
+      <div style="background:var(--blanco);border:1px solid var(--gris-borde);border-radius:10px;padding:18px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Presupuesto Disponible (simulado)</div>
+        <input type="range" id="presupuesto-slider" min="50000" max="2000000" step="50000" value="500000" oninput="actualizarPlanes()" style="width:100%;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;">
+          <span>$50,000</span>
+          <span id="presupuesto-val" style="font-weight:700;color:var(--azul);">$500,000 MXN</span>
+          <span>$2,000,000</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN: CHAT -->
+    <section id="sec-chat" class="section active">
+      <div class="section-title">URBIA AI — Asistente</div>
+      <div class="section-sub">Pregunta sobre los datos cargados. Las respuestas se basan únicamente en información registrada en el sistema.</div>
+      <div class="alert alert-info">ℹ️ URBIA AI nunca genera cifras que no estén en la base de datos. Cada respuesta incluye fuente y nivel de confianza.</div>
+
+      <div id="chat-container">
+        <div id="chat-messages">
+          <div class="msg msg-bot">¡Hola! Soy <strong>URBIA AI</strong>, tu asistente inteligente para la Ciudad de México. 🏙️
+
+Puedo ayudarte a entender la situación de la infraestructura urbana con datos reales de reportes ciudadanos.
+
+💡 <strong>Tip:</strong> Si quieres explorar visualmente las zonas de riesgo, ve a la sección <strong>"🗺️ Mapa de Riesgo"</strong> en el menú para ver información geolocalizada y detallada.
+
+¿En qué te puedo ayudar?</div>
+        </div>
+        <div class="preguntas-sugeridas" id="sugerencias"></div>
+        <div id="chat-input-row">
+          <input id="chat-input" type="text" placeholder="Escribe tu pregunta…" onkeydown="if(event.key==='Enter') enviarMensaje()" />
+          <button id="chat-send" onclick="enviarMensaje()">Enviar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN: FUENTES -->
+    <section id="sec-fuentes" class="section">
+      <div class="section-title">Fuentes y Normativa</div>
+      <div class="section-sub">Catálogo de conjuntos de datos y marco normativo de referencia.</div>
+
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Fuentes de Datos</div>
+      <div class="fuentes-grid" id="fuentes-grid"></div>
+
+      <div style="font-size:14px;font-weight:600;margin:20px 0 12px;">Marco Normativo (Referencial)</div>
+      <div id="normativa-content"></div>
+    </section>
+
+    <!-- SECCIÓN: CARGA -->
+    <section id="sec-carga" class="section">
+      <div class="section-title">Cargar Datos</div>
+      <div class="section-sub">Importa reportes desde archivos CSV. Los datos históricos y reales se etiquetan por separado.</div>
+
+      <div class="upload-area" id="upload-area">
+        <div style="font-size:32px;margin-bottom:12px;">📁</div>
+        <p style="font-weight:600;margin-bottom:6px;">Arrastra un archivo CSV aquí</p>
+        <p>o haz clic para seleccionar</p>
+        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="subirCSV(event)" />
+        <button class="btn btn-primary" style="margin-top:14px;" onclick="document.getElementById('csv-input').click()">Seleccionar archivo</button>
+      </div>
+
+      <div style="margin-top:20px;background:var(--blanco);border:1px solid var(--gris-borde);border-radius:10px;padding:18px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px;">Formato esperado del CSV</div>
+        <code style="font-size:12px;background:#f8fafc;padding:10px;border-radius:6px;display:block;overflow-x:auto;">id,fuente,origen,fecha_reporte,alcaldia,colonia,calle,categoria,subcategoria,descripcion,latitud,longitud,estado,es_emergencia</code>
+        <div style="margin-top:10px;font-size:12px;color:var(--texto-suave);">
+          <strong>origen:</strong> "real" o "demo" | <strong>categoria:</strong> vial / hidraulica / seguridad / otro<br>
+          <strong>es_emergencia:</strong> true / false | Coordenadas en decimal (ej. 19.4284)
+        </div>
+      </div>
+      <div id="upload-result" style="margin-top:14px;"></div>
+    </section>
+
+  </div><!-- .content -->
+</div><!-- #main -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
